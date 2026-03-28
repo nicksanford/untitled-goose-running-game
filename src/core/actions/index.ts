@@ -39,6 +39,17 @@ const GOOSE_NAMES = [
   "Truffle",
   "Dumpling",
 ];
+const GOOSE_COLORS = [
+  "#ff6ec7", // hot pink
+  "#39ff14", // neon green
+  "#ff4500", // orange red
+  "#7b68ee", // medium slate blue
+  "#ffd700", // gold
+  "#00ced1", // dark turquoise
+  "#ff1493", // deep pink
+  "#adff2f", // green yellow
+];
+
 const _pt = new THREE.Vector3();
 const _tan = new THREE.Vector3();
 const _normal = new THREE.Vector3();
@@ -59,7 +70,7 @@ export const actions = createActions((world) => ({
       Position,
       IsGoose,
       RaceProgress({ value: 0 }),
-      Player({ index, name: name ?? randomGooseName() }),
+      Player({ index, name: name ?? randomGooseName(), color: GOOSE_COLORS[index % GOOSE_COLORS.length] }),
     );
     if (self) {
       entity.add(IsSelf);

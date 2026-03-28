@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useTraitEffect } from "koota/react";
 import type { Entity } from "koota";
-import { Group } from "three";
+import { Color, Group, Mesh, MeshStandardMaterial } from "three";
 import { SkeletonUtils } from "three/examples/jsm/Addons.js";
 import { Billboard, Text, useGLTF, useAnimations } from "@react-three/drei";
 import { IsGoose, Player, PlayerInput, RaceProgress, Ref } from "@/core/traits";
@@ -13,9 +13,18 @@ const MIN_PLAYBACK_RATE = 0.4;
 const MAX_PLAYBACK_RATE = 2.0;
 const MAX_INPUT_SPEED = 0.15;
 
-function GooseView({ entity, name }: { entity: Entity; name: string }) {
+function GooseView({ entity, name, color }: { entity: Entity; name: string; color: string }) {
   const { scene, animations } = useGLTF(GOOSE_MODEL_PATH);
   const clone = useMemo(() => SkeletonUtils.clone(scene), [scene]);
+
+  useEffect(() => {
+    clone.traverse((child) => {
+      if (child instanceof Mesh && child.material instanceof MeshStandardMaterial && child.material.name === "Shoe_Accent") {
+        child.material = child.material.clone();
+        child.material.color = new Color(color);
+      }
+    });
+  }, [clone, color]);
   const groupRef = useRef<Group>(null);
   const { actions } = useAnimations(animations, groupRef);
   const wasRunningRef = useRef(false);
@@ -122,6 +131,7 @@ export function GooseRenderer() {
           key={entity.id()}
           entity={entity}
           name={entity.get(Player)?.name ?? "Goose"}
+          color={entity.get(Player)?.color ?? "#ffffff"}
         />
       ))}
     </>

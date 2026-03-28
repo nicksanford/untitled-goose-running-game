@@ -16,7 +16,7 @@ export const OrthographicCamera = trait();
 
 export const RaceProgress = trait({ value: 0 });
 
-export const Player = trait({ index: 0, name: "" });
+export const Player = trait({ index: 0, name: "", color: "#ffffff" });
 
 export const Wind = trait({ strength: 0.15, speed: 0.8 });
 export const GrassBase = trait(() => null! as Float32Array);
