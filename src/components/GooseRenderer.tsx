@@ -18,7 +18,6 @@ function GooseView({ entity, name }: { entity: Entity; name: string }) {
   const clone = useMemo(() => SkeletonUtils.clone(scene), [scene]);
   const groupRef = useRef<Group>(null);
   const { actions } = useAnimations(animations, groupRef);
-  const isPlayerControlled = entity.has(PlayerInput);
   const wasRunningRef = useRef(false);
 
   const handleInit = useCallback(
@@ -37,27 +36,24 @@ function GooseView({ entity, name }: { entity: Entity; name: string }) {
   }, [entity]);
 
   useEffect(() => {
-    if (isPlayerControlled) {
-      const idle = actions["GooseIdle"];
-      if (!idle) return;
-      idle.reset().fadeIn(0.2).play();
-      // eslint-disable-next-line react-hooks/immutability
-      idle.time = timeOffset;
-    } else {
-      const run = actions["GooseRun"];
-      if (!run) return;
-      run.reset().fadeIn(0.2).play();
-      run.time = timeOffset;
-    }
-  }, [actions, timeOffset, isPlayerControlled]);
+    if (entity.has(PlayerInput)) return;
+    const run = actions["GooseRun"];
+    if (!run) return;
+    run.reset().fadeIn(0.2).play();
+    run.time = timeOffset;
+    return () => {
+      run.fadeOut(0.2);
+    };
+  }, [actions, timeOffset, entity]);
 
   useTraitEffect(entity, PlayerInput, (input) => {
     if (!input) return;
+    const progress = entity.get(RaceProgress);
     const run = actions["GooseRun"];
     const idle = actions["GooseIdle"];
     const isRunning = input.speed > SPEED_THRESHOLD;
 
-    if (isRunning && !wasRunningRef.current) {
+    if (isRunning && !wasRunningRef.current && progress && progress.value < 1) {
       idle?.fadeOut(0.15);
       run?.reset().fadeIn(0.15).play();
       wasRunningRef.current = true;
@@ -65,6 +61,10 @@ function GooseView({ entity, name }: { entity: Entity; name: string }) {
       run?.fadeOut(0.15);
       idle?.reset().fadeIn(0.15).play();
       wasRunningRef.current = false;
+    } else if (!isRunning && !wasRunningRef.current && !idle?.isRunning) {
+      idle?.reset().fadeIn(0.2).play();
+      // eslint-disable-next-line react-hooks/immutability
+      if (idle) idle.time = timeOffset;
     }
 
     if (run && isRunning) {
