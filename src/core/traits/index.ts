@@ -8,3 +8,7 @@ export const Position = trait({ x: 0, y: 0, z: 0 });
 export const Ref = trait(() => null! as Object3D);
 
 export const IsGoose = trait();
+
+export const RaceProgress = trait({ value: 0 });
+
+export const Player = trait({ index: 0 });
