@@ -14,6 +14,7 @@ defmodule GooseServerWeb.LobbyChannel do
   def handle_info(:after_join, socket) do
     {:ok, _} =
       Presence.track(socket, socket.assigns.player_id, %{
+        player_name: socket.assigns.player_name,
         joined_at: System.system_time(:second)
       })
 

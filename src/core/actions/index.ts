@@ -6,6 +6,7 @@ import {
   IsActive,
   IsGoose,
   IsGrass,
+  IsSelf,
   OrthographicCamera,
   Player,
   PlayerInput,
@@ -53,14 +54,17 @@ function randomGooseName() {
 }
 
 export const actions = createActions((world) => ({
-  spawnGoose: ({ index, name }: { index: number; name?: string }) => {
+  spawnGoose: ({ index, name, self }: { index: number; name?: string; self?: boolean }) => {
     const entity = world.spawn(
       Position,
       IsGoose,
       RaceProgress({ value: 0 }),
       Player({ index, name: name ?? randomGooseName() }),
     );
-    if (index === 0) entity.add(PlayerInput);
+    if (self) {
+      entity.add(IsSelf);
+      entity.add(PlayerInput);
+    }
     return entity;
   },
   spawnGrassAlongTrack: () => {
