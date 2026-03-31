@@ -4,7 +4,7 @@ defmodule GooseServerWeb.LobbyChannelTest do
   alias GooseServerWeb.UserSocket
 
   setup do
-    {:ok, socket} = connect(UserSocket, %{"player_id" => "player1"})
+    {:ok, socket} = connect(UserSocket, %{"player_id" => "player1", "player_name" => "Alice"})
     {:ok, socket: socket}
   end
 
@@ -27,6 +27,40 @@ defmodule GooseServerWeb.LobbyChannelTest do
 
     test "connection without player_id is rejected" do
       assert :error = connect(UserSocket, %{})
+    end
+
+    test "duplicate player_name is rejected" do
+      {:ok, socket1} =
+        connect(UserSocket, %{"player_id" => "alice1", "player_name" => "Alice"})
+
+      {:ok, _reply, _socket1} = subscribe_and_join(socket1, "lobby", %{})
+
+      {:ok, socket2} =
+        connect(UserSocket, %{"player_id" => "alice2", "player_name" => "Alice"})
+
+      assert {:error, %{reason: "name_taken"}} =
+               subscribe_and_join(socket2, "lobby", %{})
+    end
+
+    test "different player_names can both join" do
+      {:ok, socket1} =
+        connect(UserSocket, %{"player_id" => "alice1", "player_name" => "Alice"})
+
+      {:ok, _reply, _socket1} = subscribe_and_join(socket1, "lobby", %{})
+
+      {:ok, socket2} =
+        connect(UserSocket, %{"player_id" => "bob1", "player_name" => "Bob"})
+
+      {:ok, _reply, _socket2} = subscribe_and_join(socket2, "lobby", %{})
+      assert_push "presence_state", %{}
+    end
+
+    test "presence includes player_name metadata", %{socket: socket} do
+      {:ok, _reply, _socket} = subscribe_and_join(socket, "lobby", %{})
+      assert_push "presence_state", presence
+
+      assert %{"player1" => %{metas: [meta | _]}} = presence
+      assert meta.player_name == "Alice"
     end
   end
 
