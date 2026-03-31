@@ -1,5 +1,5 @@
 import type { World } from "koota";
-import { Player, PlayerInput, Time } from "../traits";
+import { IsSelf, PlayerInput, Time } from "../traits";
 
 const EXPECTED_SEQUENCE = ["q", "p"] as const;
 const SPEED_DECAY = 4.0;
@@ -48,10 +48,7 @@ export function updatePlayerInput(world: World) {
 
   currentSpeed = Math.max(currentSpeed - SPEED_DECAY * delta * currentSpeed, 0);
 
-  for (const entity of world.query(PlayerInput, Player)) {
-    const player = entity.get(Player)!;
-    if (player.index === 0) {
-      entity.set(PlayerInput, { speed: currentSpeed });
-    }
+  for (const entity of world.query(PlayerInput, IsSelf)) {
+    entity.set(PlayerInput, { speed: currentSpeed });
   }
 }

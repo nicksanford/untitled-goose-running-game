@@ -3,8 +3,20 @@ import { useRouter } from "next/router";
 import {
   connectToLobby,
   disconnectFromLobby,
+  disconnectSocket,
+  createGame,
+  listGames,
+  onGameCreated,
+  offGameCreated,
   type LobbyPlayer,
+  type GameInfo,
 } from "@/lib/socket";
+import {
+  joinGame,
+  startGame,
+  leaveGame,
+  type GamePlayer,
+} from "@/lib/game-socket";
 
 const GOOSE_EMOJIS = ["🪿", "🦆", "🐥", "🥚", "🐣", "🦢"];
 
@@ -19,14 +31,23 @@ export default function Lobby() {
   const [joined, setJoined] = useState(false);
   const [myName, setMyName] = useState("");
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
+  const [games, setGames] = useState<GameInfo[]>([]);
+  const [currentGameId, setCurrentGameId] = useState<string | null>(null);
+  const [gamePlayers, setGamePlayers] = useState<GamePlayer[]>([]);
+  const [isCreator, setIsCreator] = useState(false);
   const [error, setError] = useState("");
   const [connecting, setConnecting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inGameRef = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
     inputRef.current?.focus();
-    return () => disconnectFromLobby();
+    return () => {
+      offGameCreated();
+      disconnectFromLobby();
+      if (!inGameRef.current) disconnectSocket();
+    };
   }, []);
 
   const handleJoin = useCallback(
@@ -41,8 +62,25 @@ export default function Lobby() {
         await connectToLobby(trimmed, setPlayers);
         setMyName(trimmed);
         setJoined(true);
-      } catch (err) {
-        setError("Could not connect to server. Is the goose server running?");
+
+        // Fetch existing games
+        const existingGames = await listGames();
+        setGames(existingGames);
+
+        // Listen for new games
+        onGameCreated((game: GameInfo) => {
+          setGames((prev) => {
+            if (prev.some((g) => g.id === game.id)) return prev;
+            return [...prev, game];
+          });
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("name_taken")) {
+          setError("That name is already taken. Please choose another.");
+        } else {
+          setError("Could not connect to server. Is the goose server running?");
+        }
         console.error(err);
       } finally {
         setConnecting(false);
@@ -52,10 +90,66 @@ export default function Lobby() {
   );
 
   const handleLeave = useCallback(() => {
+    offGameCreated();
     disconnectFromLobby();
+    disconnectSocket();
     setJoined(false);
     setPlayers([]);
+    setGames([]);
     setMyName("");
+  }, []);
+
+  const navigateToGame = useCallback((gameId: string) => {
+    inGameRef.current = true;
+    router.push({ pathname: "/game", query: { name: myName, gameId } });
+  }, [myName, router]);
+
+  const handleCreateGame = useCallback(async () => {
+    try {
+      const game = await createGame(`${myName}'s Race`);
+      setIsCreator(true);
+
+      const { players: gamePlrs } = await joinGame(game.id, myName, {
+        onPlayersChanged: setGamePlayers,
+        onPositionUpdate: () => {},
+        onGameStarted: () => navigateToGame(game.id),
+      });
+      setGamePlayers(gamePlrs);
+      setCurrentGameId(game.id);
+    } catch (err) {
+      setError("Failed to create game");
+      console.error(err);
+    }
+  }, [myName, navigateToGame]);
+
+  const handleJoinGame = useCallback(
+    async (gameId: string) => {
+      try {
+        const { players: gamePlrs } = await joinGame(gameId, myName, {
+          onPlayersChanged: setGamePlayers,
+          onPositionUpdate: () => {},
+          onGameStarted: () => navigateToGame(gameId),
+        });
+        setGamePlayers(gamePlrs);
+        setCurrentGameId(gameId);
+        setIsCreator(false);
+      } catch (err) {
+        setError("Failed to join game");
+        console.error(err);
+      }
+    },
+    [myName, navigateToGame],
+  );
+
+  const handleLeaveGame = useCallback(() => {
+    leaveGame();
+    setCurrentGameId(null);
+    setGamePlayers([]);
+    setIsCreator(false);
+  }, []);
+
+  const handleStartRace = useCallback(() => {
+    startGame();
   }, []);
 
   return (
@@ -92,7 +186,62 @@ export default function Lobby() {
             </button>
             {error && <p style={styles.error}>{error}</p>}
           </form>
+        ) : currentGameId ? (
+          /* Game waiting room */
+          <div style={styles.lobbyContent}>
+            <div style={styles.welcomeBar}>
+              <span>
+                Playing as <strong>{myName}</strong>
+              </span>
+              <button onClick={handleLeaveGame} style={styles.leaveButton}>
+                Leave Game
+              </button>
+            </div>
+
+            <div style={styles.playerListHeader}>
+              <span style={styles.dot} />
+              {gamePlayers.length} player{gamePlayers.length !== 1 ? "s" : ""} in
+              game
+            </div>
+
+            <ul style={styles.playerList}>
+              {gamePlayers.map((p) => (
+                <li
+                  key={p.id}
+                  style={{
+                    ...styles.playerItem,
+                    ...(p.name === myName ? styles.playerItemMe : {}),
+                  }}
+                >
+                  <span style={styles.playerEmoji}>{pickEmoji(p.id)}</span>
+                  <span style={styles.playerName}>{p.name}</span>
+                  {p.name === myName && (
+                    <span style={styles.youBadge}>you</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            {gamePlayers.length < 4 && (
+              <p style={styles.aiNote}>
+                {4 - gamePlayers.length} AI goose{4 - gamePlayers.length !== 1 ? "s" : ""} will fill empty slots
+              </p>
+            )}
+
+            {isCreator ? (
+              <button onClick={handleStartRace} style={styles.startButton}>
+                Start Race 🏁
+              </button>
+            ) : (
+              <div style={styles.waitingText}>
+                Waiting for host to start the race...
+              </div>
+            )}
+
+            {error && <p style={styles.error}>{error}</p>}
+          </div>
         ) : (
+          /* Lobby view */
           <div style={styles.lobbyContent}>
             <div style={styles.welcomeBar}>
               <span>
@@ -129,12 +278,35 @@ export default function Lobby() {
                 ))}
             </ul>
 
-            <button
-              onClick={() => router.push({ pathname: "/game", query: { name: myName } })}
-              style={styles.startButton}
-            >
-              Start Race 🏁
+            <div style={styles.sectionDivider} />
+
+            <div style={styles.playerListHeader}>
+              <span>Games</span>
+            </div>
+
+            {games.length === 0 ? (
+              <p style={styles.noGames}>No games yet. Create one!</p>
+            ) : (
+              <ul style={styles.playerList}>
+                {games.map((game) => (
+                  <li key={game.id} style={styles.gameItem}>
+                    <span style={styles.gameName}>{game.name}</span>
+                    <button
+                      onClick={() => handleJoinGame(game.id)}
+                      style={styles.joinButton}
+                    >
+                      Join
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <button onClick={handleCreateGame} style={styles.startButton}>
+              Create Game
             </button>
+
+            {error && <p style={styles.error}>{error}</p>}
           </div>
         )}
       </div>
@@ -303,5 +475,54 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     marginTop: 4,
     transition: "transform 0.1s, opacity 0.2s",
+  },
+  sectionDivider: {
+    height: 1,
+    background: "rgba(255,255,255,0.1)",
+    margin: "4px 0",
+  },
+  noGames: {
+    color: "rgba(232,245,232,0.4)",
+    fontSize: 14,
+    textAlign: "center" as const,
+    margin: "4px 0",
+  },
+  gameItem: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "12px 16px",
+    borderRadius: 12,
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.06)",
+  },
+  gameName: {
+    fontSize: 15,
+    fontWeight: 600,
+    flex: 1,
+  },
+  joinButton: {
+    padding: "6px 16px",
+    borderRadius: 8,
+    border: "none",
+    background: "linear-gradient(135deg, #4ade80, #22c55e)",
+    color: "#052e16",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  aiNote: {
+    color: "rgba(232,245,232,0.4)",
+    fontSize: 13,
+    textAlign: "center" as const,
+    margin: 0,
+    fontStyle: "italic",
+  },
+  waitingText: {
+    textAlign: "center" as const,
+    color: "rgba(232,245,232,0.5)",
+    fontSize: 15,
+    padding: "14px 0",
+    fontStyle: "italic",
   },
 };

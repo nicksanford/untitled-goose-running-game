@@ -6,6 +6,7 @@ import {
   IsActive,
   IsGoose,
   IsGrass,
+  IsRemotePlayer,
   IsSelf,
   OrthographicCamera,
   Player,
@@ -19,7 +20,7 @@ import { trackCurve } from "../track";
 const GRASS_SAMPLES = 30;
 const PATCHES_PER_SIDE = 3;
 const TRACK_HALF_WIDTH = 2.2;
-const GOOSE_NAMES = [
+export const GOOSE_NAMES = [
   "Puddles",
   "Biscuit",
   "Noodle",
@@ -65,7 +66,7 @@ function randomGooseName() {
 }
 
 export const actions = createActions((world) => ({
-  spawnGoose: ({ index, name, self }: { index: number; name?: string; self?: boolean }) => {
+  spawnGoose: ({ index, name, self, remote }: { index: number; name?: string; self?: boolean; remote?: boolean }) => {
     const entity = world.spawn(
       Position,
       IsGoose,
@@ -75,6 +76,9 @@ export const actions = createActions((world) => ({
     if (self) {
       entity.add(IsSelf);
       entity.add(PlayerInput);
+    }
+    if (remote) {
+      entity.add(IsRemotePlayer);
     }
     return entity;
   },

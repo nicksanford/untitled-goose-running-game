@@ -6,8 +6,21 @@ defmodule GooseServerWeb.LobbyChannel do
 
   @impl true
   def join("lobby", _params, socket) do
-    send(self(), :after_join)
-    {:ok, socket}
+    player_name = socket.assigns.player_name
+
+    name_taken =
+      "lobby"
+      |> Presence.list()
+      |> Enum.any?(fn {_id, %{metas: metas}} ->
+        Enum.any?(metas, fn meta -> meta[:player_name] == player_name end)
+      end)
+
+    if name_taken do
+      {:error, %{reason: "name_taken"}}
+    else
+      send(self(), :after_join)
+      {:ok, socket}
+    end
   end
 
   @impl true

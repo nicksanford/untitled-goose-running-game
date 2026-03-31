@@ -4,6 +4,7 @@ import { useWorld } from "koota/react";
 import { updateTime } from "@/core/systems/update-time";
 import { updatePlayerInput, initPlayerInput, cleanupPlayerInput } from "@/core/systems/player-input";
 import { advanceRace } from "@/core/systems/advance-race";
+import { syncPositionToServer } from "@/core/systems/sync-position-to-server";
 import { mapProgressToTrack } from "@/core/systems/map-progress-to-track";
 import { followTarget } from "@/core/systems/follow-player";
 import { swayGrass } from "@/core/systems/sway-grass";
@@ -21,6 +22,7 @@ export function Frameloop() {
     updateTime(world);
     updatePlayerInput(world);
     advanceRace(world);
+    syncPositionToServer(world);
     mapProgressToTrack(world);
     followTarget(world);
     swayGrass(world);

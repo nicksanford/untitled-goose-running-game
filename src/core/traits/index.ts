@@ -12,6 +12,7 @@ export const IsGoose = trait();
 export const IsGrass = trait();
 export const IsActive = trait();
 export const IsSelf = trait();
+export const IsRemotePlayer = trait();
 export const OrthographicCamera = trait();
 
 export const RaceProgress = trait({ value: 0 });
